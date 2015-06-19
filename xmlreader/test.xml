@@ -1,0 +1,44 @@
+<Battlecruiser>
+
+   <shipCaracteristics>
+	
+		<inertia value="10" /> 
+		<storage value="150.75"/> 
+		<nbTurretFwdMax value="3"/> 
+		<nbTurretUpwdMax value="5"/> 
+		<nbTurretDnwdMax value="2"/> 
+		<nbTurretLMax value="1"/> 
+		<nbTurretRMax value="1"/> 
+		<rudder value="10"/> 
+		<hullMax value="500"/> 
+		<wpnStoMax value="500"/> 
+		<wpnGenMax value="20"/> 
+		<energyStoMax value="10000"/> 
+		<energyGen value="100"/> 
+
+   </shipCaracteristics>
+	
+   <allowedEquipementList> 
+
+		<equipement> 2GJShield </equipement> 
+		<equipement> plasma_injector </equipement> 
+		<equipement> arme1 </equipement> 
+		<equipement> arme2 </equipement> 
+		<equipement> E2PZ </equipement> 
+		<equipement> propulseur_electrique </equipement> 
+		<equipement> wpn_energy_module </equipement> 
+
+   </allowedEquipementList> 
+
+   <maxAllowances>
+
+		<accelerationAllowed value="2"/>
+		<decelerationAllowed value="2"/>
+		<shieldMaxAllowed value="200000"/> 
+		<wpnStoMaxAllowed value="200000"/> 
+		<speedMaxAllowed value="20"/> 
+		<energyStoMaxAllowed value="20000"/> 
+
+   </maxAllowances>
+
+</Battlecruiser>

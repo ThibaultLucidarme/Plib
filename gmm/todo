@@ -1,0 +1,9 @@
+complete type convertor (boost free)
+	partially done
+
+complete txt file parser (take html format into account, choose type, delimiter etc...)
+
+delete vector of pointer functor (cf NeuralNetwork.*pp)
+
+
+

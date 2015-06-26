@@ -15,8 +15,14 @@
 #include <string>
 #include <cstdarg>
 #include <vector>
+#include <exception>
 #include <map>
-#include "../convertType.hpp"
+#include "convertType.hpp"
+
+#define PROJECT_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define PROJECT_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define PROJECT_VERSION_PATCH @PROJECT_VERSION_PATCH@
+
 
 namespace p
 {
@@ -26,12 +32,16 @@ private:
 int								   _numArg;
 std::vector<std::string>		   _argList;
 std::map<std::string, std::string> _argmap;
-
+std::map<std::string, std::string> _descriptionmap;
+bool _displayHelp;
+char* _appName;
 
 public:
 CommandLineParser(int argc, char** argv)
 {
 	_numArg = argc;
+	_displayHelp = false;
+	_appName = argv[0];
 
 	// convert char** to vector<string>
 
@@ -42,18 +52,34 @@ CommandLineParser(int argc, char** argv)
 		ss << argv[i];
 		ss >> s;
 		_argList.push_back(s);
+		
+		if(s=="-h" || s=="--help")
+		{
+			_displayHelp = true;
+		}
+		if(s=="--version")
+		{
+			DisplayOption();
+		}
 	}
 
 	// map <option , Argument>
 
-	for (int i = 0; i < _argList.size(); i++)
+	for (unsigned int i = 0; i < _argList.size(); i++)
 	{
 		if (_argList[i][0] == '-')
 		{
-			if (_argList[i + 1][0] != '-')
-				_argmap.insert(std::pair<std::string, std::string>(_argList[i], _argList[i + 1]) );
+			if(i!=_argList.size()-1) // _argList[i + 1] exists
+			{
+				if (_argList[i + 1][0] != '-')
+					_argmap.insert(std::pair<std::string, std::string>(_argList[i], _argList[i + 1]) );
+				else
+					_argmap.insert(std::pair<std::string, std::string>(_argList[i],  "") );
+			}
 			else
-				_argmap.insert(std::pair<std::string, std::string>(_argList[i], "") );
+			{
+				_argmap.insert(std::pair<std::string, std::string>(_argList[i],  "") );
+			}
 		}
 	}
 }
@@ -73,8 +99,44 @@ Type addOption(std::string optName, Type defaultValue, std::string description =
 	else
 		result = defaultValue;
 
+	std::string defaultVal;
+	p::ConvertType(defaultValue, defaultVal);
+	description = description+" [default:"+defaultVal+"]";
+	_descriptionmap.insert(std::pair<std::string, std::string>(optName, description) );
+
 	return result;
 }
+
+// Needs to be added at the end of all addOption calls
+void addHelpOption(std::string s="")
+{
+	if(_displayHelp)
+	{
+		std::cout<<std::endl<<"Usage:"<<std::endl;
+		std::cout<<_appName<<" [options]"<<std::endl;
+		std::cout<<"Options:"<<std::endl;
+		for (auto& opt: _descriptionmap) 
+		{
+			std::cout <<"\t"<< opt.first << ":\t" << opt.second << '\n';
+		}
+		
+		std::cout << std::endl<<s<<std::endl;
+		
+		exit(EXIT_SUCCESS);
+		
+	}
+}
+
+void DisplayOption()
+{
+	std::string version = PROJECT_VERSION_MAJOR+"."+PROJECT_VERSION_MINOR+"."+PROJECT_VERSION_PATCH;
+		
+	std::cout<<std::endl<<_appName<<" version: "<<_version<<std::endl<<std::endl;
+	
+	exit(EXIT_SUCCESS);
+}
+
+
 };
 
 
@@ -83,6 +145,7 @@ Type addOption(std::string optName, Type defaultValue, std::string description =
  * CommandLineParser parser(argc, argv);
  * parser.addOption<int>( "-i", &input);
  * parser.addOption<std::string>( "-s", &allo, &quiEst, &la );
+ * parser.addHelpOption();
  *
  *
  *** overload
@@ -90,29 +153,7 @@ Type addOption(std::string optName, Type defaultValue, std::string description =
  *
  * int i = parser.addOption<int>("-i", defaultValue);
  * std::string s[] = parser.addOption<std::string>( "-s", "defaultValue" );
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * parser.addHelpOption();
  *
  *
  * */

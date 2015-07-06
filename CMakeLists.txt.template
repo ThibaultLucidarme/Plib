@@ -13,8 +13,8 @@ set (CMAKE_CXX_FLAGS "-Wall -Werror -pedantic -g -std=c++11")
 # Versioning
 # Replace @VARIABLES@ with CMake values
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/CommandLineParser.hpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/CommandLineParser.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/.version.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp"
   )
 
 # Source
@@ -31,11 +31,12 @@ add_executable( ${PROJECT_NAME} ${Project_SOURCES} )
 find_package(OpenGL REQUIRED)
 include_directories(${OPENGL_INCLUDE_DIR})
 if (OPENGL_FOUND)
-  target_link_libraries(${EXECUTABLE_NAME} ${OPENGL_LIBRARIES})
-  target_link_libraries(${EXECUTABLE_NAME} m)  # if using maths.h
+  target_link_libraries(${PROJECT_NAME} ${OPENGL_LIBRARIES})
+  target_link_libraries(${PROJECT_NAME} m)  # if using maths.h
 endif()
 
 # SFML
+# SFML unknown to CMAKE by default -> need to copy FindSFML.cmake to /usr/shared/cmake-2.8/Modules
 #find_package(SFML 1.6 REQUIRED system window graphics network audio)
 find_package(SFML 2 REQUIRED system window graphics network audio)
 include_directories(${SFML_INCLUDE_DIR})
@@ -49,7 +50,7 @@ endif()
 find_package(Boost 1.34.0 REQUIRED system filesystem)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
-  target_link_libraries(${EXECUTABLE_NAME} ${Boost_LIBRARIES})
+  target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
 endif()
 
 # Create installer

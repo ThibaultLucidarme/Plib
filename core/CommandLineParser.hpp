@@ -1,27 +1,26 @@
 /*
- * minimal code
- *
- *#include "CommandLineParser.hpp"
-    p::CommandLineParser parser(argc, argv);
+  example code
+ 
+  #include "CommandLineParser.hpp"
+  p::CommandLineParser parser(argc, argv);
 
-    int input = parser.addOption<int>("-i",-17,"test int");
-    std::string allo = parser.addOption<std::string>("-s","coucou","test string");
-    std::string peep = parser.addOption<std::string>("-p","salut");
+  int input = parser.addOption<int>("-i",-17,"test int");
+  std::string allo = parser.addOption<std::string>("-s","coucou","test string");
+  std::string peep = parser.addOption<std::string>("-p","salut");
+  parser.addHelpOption();
 
+*/
 
- */
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <cstring>
 #include <cstdarg>
 #include <vector>
 #include <exception>
 #include <map>
-#include "convertType.hpp"
 
-#define PROJECT_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
-#define PROJECT_VERSION_MINOR @PROJECT_VERSION_MINOR@
-#define PROJECT_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#include "version.hpp"
 
 
 namespace p
@@ -34,7 +33,64 @@ std::vector<std::string>		   _argList;
 std::map<std::string, std::string> _argmap;
 std::map<std::string, std::string> _descriptionmap;
 bool _displayHelp;
-char* _appName;
+std::string _appName;
+//char* _appName;
+
+
+ // STRING INT
+    void ConvertType(std::string& s, int& i)
+	{
+		i = std::atoi( s.c_str() );		
+	}
+
+    void ConvertType(int& i, std::string& s)
+    {
+        std::stringstream ss;
+        ss << i;
+        ss >> s;
+    }
+
+    // STRING FLOAT
+	void ConvertType(std::string& s, float& f)
+	{
+		f = (float)std::atof( s.c_str() );
+	}
+    
+    void ConvertType(float& f, std::string& s)
+    {
+        std::stringstream ss;
+        ss << f;
+        ss >> s;
+    }
+
+    // STRING DOUBLE
+	void ConvertType(std::string& s, double& d)
+	{
+		d = std::atof( s.c_str() );
+	}
+    
+    void ConvertType(double& d, std::string& s)
+    {
+        std::stringstream ss;
+        ss << d;
+        ss >> s;
+    }
+	
+    // STRING CHAR*
+	void ConvertType(std::string& s, char* c)
+	{
+        //c_str returns a const char*
+		c = const_cast<char*>( s.c_str() );
+	}
+    
+    void ConvertType(char* c, std::string& s)
+    {
+        std::stringstream ss;
+        ss << c;
+        ss >> s;
+    }
+
+
 
 public:
 CommandLineParser(int argc, char** argv)
@@ -42,6 +98,13 @@ CommandLineParser(int argc, char** argv)
 	_numArg = argc;
 	_displayHelp = false;
 	_appName = argv[0];
+	
+	std::string key = "/";
+	std::size_t found = _appName.rfind(key);
+	if (found!=std::string::npos)
+		_appName.replace (0,found+1,"");
+	
+	
 
 	// convert char** to vector<string>
 
@@ -92,7 +155,7 @@ Type addOption(std::string optName, Type defaultValue, std::string description =
 	//if option is found
 
 	if (_argmap.find(optName) != _argmap.end() )
-		p::ConvertType(_argmap.find(optName)->second, result);
+		ConvertType(_argmap.find(optName)->second, result);
 
 	//if option not found, assign default value
 
@@ -100,7 +163,7 @@ Type addOption(std::string optName, Type defaultValue, std::string description =
 		result = defaultValue;
 
 	std::string defaultVal;
-	p::ConvertType(defaultValue, defaultVal);
+	ConvertType(defaultValue, defaultVal);
 	description = description+" [default:"+defaultVal+"]";
 	_descriptionmap.insert(std::pair<std::string, std::string>(optName, description) );
 
@@ -119,6 +182,7 @@ void addHelpOption(std::string s="")
 		{
 			std::cout <<"\t"<< opt.first << ":\t" << opt.second << '\n';
 		}
+		std::cout <<"\t--version:\tPrint the version number of "+_appName+" and exit.\n";
 		
 		std::cout << std::endl<<s<<std::endl;
 		
@@ -129,9 +193,8 @@ void addHelpOption(std::string s="")
 
 void DisplayOption()
 {
-	std::string version = PROJECT_VERSION_MAJOR+"."+PROJECT_VERSION_MINOR+"."+PROJECT_VERSION_PATCH;
-		
-	std::cout<<std::endl<<_appName<<" version: "<<_version<<std::endl<<std::endl;
+	
+	std::cout<<std::endl<<_appName<<" version: "<<PROJECT_VERSION<<std::endl<<std::endl;
 	
 	exit(EXIT_SUCCESS);
 }
@@ -139,22 +202,8 @@ void DisplayOption()
 
 };
 
-
-/*
- *
- * CommandLineParser parser(argc, argv);
- * parser.addOption<int>( "-i", &input);
- * parser.addOption<std::string>( "-s", &allo, &quiEst, &la );
- * parser.addHelpOption();
- *
- *
- *** overload
- *
- *
- * int i = parser.addOption<int>("-i", defaultValue);
- * std::string s[] = parser.addOption<std::string>( "-s", "defaultValue" );
- * parser.addHelpOption();
- *
- *
- * */
 }
+
+
+
+

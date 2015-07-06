@@ -24,8 +24,8 @@ set (CMAKE_CXX_FLAGS "-Wall -Werror -pedantic -g -std=c++11")
 # Versioning
 # Replace @VARIABLES@ with CMake values
 configure_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/CommandLineParser.hpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/CommandLineParser.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/.version.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/version.hpp"
   )
 
 # Source
@@ -42,14 +42,14 @@ add_executable( ${PROJECT_NAME} ${Project_SOURCES} )
 find_package(OpenGL REQUIRED)
 include_directories(${OPENGL_INCLUDE_DIR})
 if (OPENGL_FOUND)
-  target_link_libraries(${EXECUTABLE_NAME} ${OPENGL_LIBRARIES})
-  target_link_libraries(${EXECUTABLE_NAME} m)  # if using maths.h
+  target_link_libraries(${PROJECT_NAME} ${OPENGL_LIBRARIES})
+  target_link_libraries(${PROJECT_NAME} m)  # if using maths.h
 endif()
 
 # SFML
-set(CMAKE_MODULE_PATH "path/to/folder/containing/FindSFML.cmake/" ${CMAKE_MODULE_PATH})
+# SFML unknown to CMAKE by default -> need to copy FindSFML.cmake to /usr/shared/cmake-2.8/Modules
 #find_package(SFML 1.6 REQUIRED system window graphics network audio)
-find_package(SFML 2.3 REQUIRED system window graphics network audio)
+find_package(SFML 2 REQUIRED system window graphics network audio)
 include_directories(${SFML_INCLUDE_DIR})
 if(SFML_FOUND)
   include_directories(${SFML_INCLUDE_DIR})
@@ -61,7 +61,7 @@ endif()
 find_package(Boost 1.34.0 REQUIRED system filesystem)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
-  target_link_libraries(${EXECUTABLE_NAME} ${Boost_LIBRARIES})
+  target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
 endif()
 
 # Create installer
@@ -88,36 +88,50 @@ else(WIN32 AND NOT UNIX)
 endif(WIN32 AND NOT UNIX)
 set(CPACK_PACKAGE_EXECUTABLES ${PROJECT_NAME} ${PROJECT_NAME})
 include(CPack)
+
 '> $dir/CMakeLists.txt
 
+# .version.in needed by CMakeLists.txt to generate version.hpp used by CommandLineParser.hpp
+echo'
+#ifndef VERSION_HPP
+#define VERSION_HPP
 
-
-
-echo '
-/*
- * minimal code
- *
- *#include "CommandLineParser.hpp"
-    p::CommandLineParser parser(argc, argv);
-
-    int input = parser.addOption<int>("-i",-17,"test int");
-    std::string allo = parser.addOption<std::string>("-s","coucou","test string");
-    std::string peep = parser.addOption<std::string>("-p","salut");
-
-
- */
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <cstdarg>
-#include <vector>
-#include <exception>
-#include <map>
-#include "convertType.hpp"
 
 #define PROJECT_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
 #define PROJECT_VERSION_MINOR @PROJECT_VERSION_MINOR@
 #define PROJECT_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define PROJECT_VERSION "@PROJECT_VERSION_MAJOR@.@PROJECT_VERSION_MINOR@.@PROJECT_VERSION_PATCH@"
+
+
+#endif
+'>$dir/.version.in
+
+
+# CommandLineParser.hpp
+echo '
+/*
+  example code
+ 
+  #include "CommandLineParser.hpp"
+  p::CommandLineParser parser(argc, argv);
+
+  int input = parser.addOption<int>("-i",-17,"test int");
+  std::string allo = parser.addOption<std::string>("-s","coucou","test string");
+  std::string peep = parser.addOption<std::string>("-p","salut");
+  parser.addHelpOption();
+
+*/
+
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <cstring>
+#include <cstdarg>
+#include <vector>
+#include <exception>
+#include <map>
+
+#include "version.hpp"
 
 
 namespace p
@@ -130,7 +144,64 @@ std::vector<std::string>		   _argList;
 std::map<std::string, std::string> _argmap;
 std::map<std::string, std::string> _descriptionmap;
 bool _displayHelp;
-char* _appName;
+std::string _appName;
+//char* _appName;
+
+
+ // STRING INT
+    void ConvertType(std::string& s, int& i)
+	{
+		i = std::atoi( s.c_str() );		
+	}
+
+    void ConvertType(int& i, std::string& s)
+    {
+        std::stringstream ss;
+        ss << i;
+        ss >> s;
+    }
+
+    // STRING FLOAT
+	void ConvertType(std::string& s, float& f)
+	{
+		f = (float)std::atof( s.c_str() );
+	}
+    
+    void ConvertType(float& f, std::string& s)
+    {
+        std::stringstream ss;
+        ss << f;
+        ss >> s;
+    }
+
+    // STRING DOUBLE
+	void ConvertType(std::string& s, double& d)
+	{
+		d = std::atof( s.c_str() );
+	}
+    
+    void ConvertType(double& d, std::string& s)
+    {
+        std::stringstream ss;
+        ss << d;
+        ss >> s;
+    }
+	
+    // STRING CHAR*
+	void ConvertType(std::string& s, char* c)
+	{
+        //c_str returns a const char*
+		c = const_cast<char*>( s.c_str() );
+	}
+    
+    void ConvertType(char* c, std::string& s)
+    {
+        std::stringstream ss;
+        ss << c;
+        ss >> s;
+    }
+
+
 
 public:
 CommandLineParser(int argc, char** argv)
@@ -138,6 +209,13 @@ CommandLineParser(int argc, char** argv)
 	_numArg = argc;
 	_displayHelp = false;
 	_appName = argv[0];
+	
+	std::string key = "/";
+	std::size_t found = _appName.rfind(key);
+	if (found!=std::string::npos)
+		_appName.replace (0,found+1,"");
+	
+	
 
 	// convert char** to vector<string>
 
@@ -163,11 +241,11 @@ CommandLineParser(int argc, char** argv)
 
 	for (unsigned int i = 0; i < _argList.size(); i++)
 	{
-		if (_argList[i][0] == "-")
+		if (_argList[i][0] == '-')
 		{
 			if(i!=_argList.size()-1) // _argList[i + 1] exists
 			{
-				if (_argList[i + 1][0] != "-")
+				if (_argList[i + 1][0] != '-')
 					_argmap.insert(std::pair<std::string, std::string>(_argList[i], _argList[i + 1]) );
 				else
 					_argmap.insert(std::pair<std::string, std::string>(_argList[i],  "") );
@@ -188,7 +266,7 @@ Type addOption(std::string optName, Type defaultValue, std::string description =
 	//if option is found
 
 	if (_argmap.find(optName) != _argmap.end() )
-		p::ConvertType(_argmap.find(optName)->second, result);
+		ConvertType(_argmap.find(optName)->second, result);
 
 	//if option not found, assign default value
 
@@ -196,7 +274,7 @@ Type addOption(std::string optName, Type defaultValue, std::string description =
 		result = defaultValue;
 
 	std::string defaultVal;
-	p::ConvertType(defaultValue, defaultVal);
+	ConvertType(defaultValue, defaultVal);
 	description = description+" [default:"+defaultVal+"]";
 	_descriptionmap.insert(std::pair<std::string, std::string>(optName, description) );
 
@@ -213,8 +291,9 @@ void addHelpOption(std::string s="")
 		std::cout<<"Options:"<<std::endl;
 		for (auto& opt: _descriptionmap) 
 		{
-			std::cout <<"\t"<< opt.first << ":\t" << opt.second << "\n";
+			std::cout <<"\t"<< opt.first << ":\t" << opt.second << '\n';
 		}
+		std::cout <<"\t--version:\tPrint the version number of "+_appName+" and exit.\n";
 		
 		std::cout << std::endl<<s<<std::endl;
 		
@@ -225,34 +304,14 @@ void addHelpOption(std::string s="")
 
 void DisplayOption()
 {
-	std::string version = PROJECT_VERSION_MAJOR+"."+PROJECT_VERSION_MINOR+"."+PROJECT_VERSION_PATCH;
-		
-	std::cout<<std::endl<<_appName<<" version: "<<_version<<std::endl<<std::endl;
+	
+	std::cout<<std::endl<<_appName<<" version: "<<PROJECT_VERSION<<std::endl<<std::endl;
 	
 	exit(EXIT_SUCCESS);
 }
 
-
 };
 
-
-/*
- *
- * CommandLineParser parser(argc, argv);
- * parser.addOption<int>( "-i", &input);
- * parser.addOption<std::string>( "-s", &allo, &quiEst, &la );
- * parser.addHelpOption();
- *
- *
- *** overload
- *
- *
- * int i = parser.addOption<int>("-i", defaultValue);
- * std::string s[] = parser.addOption<std::string>( "-s", "defaultValue" );
- * parser.addHelpOption();
- *
- *
- * */
 }
 
 '> $dir/src/CommandLineParser.hpp

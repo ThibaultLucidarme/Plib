@@ -8,7 +8,13 @@ do
 	mkdir $dir/build
 	mkdir $dir/doc
 	mkdir $dir/data
-		
+	
+	# .gitignore build directory content
+	echo '*
+
+!.gitignore'>$dir/build/.gitignore
+	
+	# CMakeLists.txt for compile
 	echo 'cmake_minimum_required(VERSION 2.8)
 
 set(PROJECT_NAME TemplateName)

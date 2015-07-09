@@ -33,6 +33,12 @@ include_directories(${OPENGL_INCLUDE_DIR})
 if (OPENGL_FOUND)
   target_link_libraries(${PROJECT_NAME} ${OPENGL_LIBRARIES})
   target_link_libraries(${PROJECT_NAME} m)  # if using maths.h
+  add_definitions(
+    -lGL
+    -lGLU
+    -DGL_GLEXT_PROTOTYPES 
+	)
+  
 endif()
 
 # SFML
@@ -43,6 +49,11 @@ include_directories(${SFML_INCLUDE_DIR})
 if(SFML_FOUND)
   include_directories(${SFML_INCLUDE_DIR})
   target_link_libraries(${PROJECT_NAME} ${SFML_LIBRARIES})
+  add_definitions(
+    -lsfml-graphics
+    -lsfml-window
+    -lsfml-system
+	)
 endif()
 
 

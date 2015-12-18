@@ -17,11 +17,10 @@ namespace p
 
 	private:
 		static bool useThreads;
-		bool inthread;
 
 		void BackPropagate(Pipeline*);
 		void CheckPipelineConnection(Pipeline*);
-		std::function<void (Pipeline*)> RetroUpdate;
+		void RetroUpdate(Pipeline* input);
 
 	protected:
 
@@ -32,7 +31,7 @@ namespace p
 		std::string _name;
 		bool _displayOutput, _isCalculated;
 		virtual O Execute(std::vector<I>) = 0;
-		virtual void Display(std::ostream& s = std::cout) {
+		virtual void toString(std::ostream& s = std::cout) {
 			s <<_name<<" - "<< _output;
 		}
 
@@ -61,14 +60,14 @@ namespace p
 	template<class I, class O>
 	std::ostream & operator<<(std::ostream &os, Pipeline<I,O>* p)
 	{
-		p->Display(os);
+		p->toString(os);
 		return os;
 	}
 
 	template<class I, class O>
 	std::ostream & operator<<(std::ostream &os, Pipeline<I,O>& p)
 	{
-		p.Display(os);
+		p.toString(os);
 		return os;
 	}
 
@@ -128,7 +127,7 @@ namespace p
 
 		for_each (_inputPipeline.begin(),
 					_inputPipeline.end(),
-					RetroUpdate);
+					std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
 
 		// Execute processing from input list
 		std::cout<<"Executing :'"<< _name <<"'"<<std::endl;
@@ -160,7 +159,7 @@ namespace p
 			for_each (std::next(_inputPipeline.begin(),1),
 					_inputPipeline.end(),
 					[this](Pipeline* input){
-						std:unique_ptr<Thread> t = new Thread(RetroUpdate);
+						std:unique_ptr<Thread> t = new Thread(std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
 						threads.push_back(t);
 					});
 

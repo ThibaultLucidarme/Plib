@@ -1,3 +1,6 @@
+#ifndef __thread__
+#define __thread__
+
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -16,9 +19,9 @@ namespace p
 	{
 	private:
 
-		static const unsigned short _optimumMaxThreads = std::thread::hardware_concurrency();
-		static unsigned short _currentThreadsInUse = 0;
-		static bool _strict = true;
+		static const unsigned short _optimumMaxThreads;
+		static unsigned short _currentThreadsInUse;
+		static bool _strict;
 
 		std::unique_ptr<std::thread> _thread;
 
@@ -70,4 +73,11 @@ namespace p
 
 	};
 
+	const unsigned short Thread::_optimumMaxThreads = std::thread::hardware_concurrency();
+	unsigned short Thread::_currentThreadsInUse = 0;
+	bool Thread::_strict = true;
+
+
 }
+
+#endif

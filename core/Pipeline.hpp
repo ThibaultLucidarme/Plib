@@ -7,6 +7,15 @@
 #include <algorithm>
 #include <functional>
 
+/******************************
+ * 
+ * TODO
+test OpenMP instead of native threading for improved portability 
+https://software.intel.com/en-us/articles/choosing-between-openmp-and-explicit-threading-methods
+ * 
+ * 
+ *****************************/
+
 
 namespace p
 {

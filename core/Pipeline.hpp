@@ -158,7 +158,6 @@ namespace p
 			else for_each (_inputPipeline.begin(),
 						_inputPipeline.end(),
 						std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
-
 		#else
 
 			for_each (_inputPipeline.begin(),

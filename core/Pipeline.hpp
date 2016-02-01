@@ -136,36 +136,11 @@ namespace p
 	void Pipeline<I,O>::Update(void)
 	{
 
-		#ifdef __thread__
+		#pragma omp parallel for if(Pipeline::useThreads)
+		for_each (std::next(_inputPipeline.begin(),1),
+				_inputPipeline.end(),
+				std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
 
-			static std::vector<std:unique_ptr<Thread>> threads;
-			if(Pipeline::useThreads)
-			{
-				// execute each previous pipeline in a separate thread
-				for_each (std::next(_inputPipeline.begin(),1),
-						_inputPipeline.end(),
-						[this](Pipeline* input){
-							std:unique_ptr<Thread> t = new Thread(std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
-							threads.push_back(t);
-						});
-
-				// join all threads before continuing execution
-				for_each (threads.begin(),
-						threads.end(),
-						[this](std::unique_ptr<Thread> t){t.join();})
-				threads.clear();
-			}
-			else for_each (_inputPipeline.begin(),
-						_inputPipeline.end(),
-						std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
-
-		#else
-
-			for_each (_inputPipeline.begin(),
-						_inputPipeline.end(),
-						bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
-
-		#endif
 
 		// Execute processing from input list
 		std::cout<<"Executing :'"<< _name <<"'"<<std::endl;

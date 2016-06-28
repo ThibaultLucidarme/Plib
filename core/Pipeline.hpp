@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <functional>
 
+#include <omp.h>
+
 
 namespace p
 {
@@ -16,20 +18,20 @@ namespace p
 	{
 
 	private:
-		static bool useThreads;
 
 		void BackPropagate(Pipeline*);
 		void CheckPipelineConnection(Pipeline*);
-		void RetroUpdate(Pipeline* input);
+		void RetroUpdate(Pipeline*);
 
 	protected:
 
 		std::vector<I> _input;
-		std::vector<Pipeline*> _inputPipeline;
+		std::vector<Pipeline*> _inputConnection;
 		O _output;
 
 		std::string _name;
 		bool _displayOutput, _isCalculated;
+
 		virtual O Execute(std::vector<I>) = 0;
 		virtual void toString(std::ostream& s = std::cout) {
 			s <<_name<<" - "<< _output;
@@ -44,6 +46,7 @@ namespace p
 		Pipeline* SetInput(const I);
 		O GetOutput(void);
 		bool HasBeenCalculated(void);
+		void EnableThreading(bool);
 
 		template<class U,class V>
 		friend std::ostream & operator << (std::ostream &os, Pipeline<U,V>* p);
@@ -55,7 +58,13 @@ namespace p
 
 
 	template<class I, class O>
-	bool Pipeline<I,O>::useThreads = false;
+	void Pipeline<I,O>::EnableThreading(bool b)
+	{
+		#ifdef _OPENMP
+			if(b) omp_set_nested(1);
+			else omp_set_nested(0);
+		#endif
+	}
 
 	template<class I, class O>
 	std::ostream & operator<<(std::ostream &os, Pipeline<I,O>* p)
@@ -75,6 +84,7 @@ namespace p
 
 	template<class I, class O>
 	Pipeline<I,O>::Pipeline(std::string s) : _name(s) {
+		EnableThreading(false);
 		_isCalculated = false;
 		_displayOutput = false;
 	}
@@ -85,6 +95,7 @@ namespace p
 		// Calculate only if needed (Memoisation)
 		if( !input->_isCalculated )
 		{
+			// #pragma omp single
 			input->Update();
 		}
 	}
@@ -116,6 +127,8 @@ namespace p
 	template<class I, class O>
 	void Pipeline<I,O>::RetroUpdate(Pipeline* input)
 	{
+		#pragma omp task
+		{
 		try
 		{
 			this->BackPropagate(input);
@@ -130,20 +143,23 @@ namespace p
 			<< std::endl;
 			throw e;
 		}
+		}
 	}
 
 	template<class I, class O>
 	void Pipeline<I,O>::Update(void)
 	{
 
-		#pragma omp parallel for if(Pipeline::useThreads)
-		for_each (std::next(_inputPipeline.begin(),1),
-				_inputPipeline.end(),
+		#pragma omp parallel
+		{
+			#pragma omp single
+			std::for_each (std::next(_inputConnection.begin(),1),
+				_inputConnection.end(),
 				std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
-
+		}
 
 		// Execute processing from input list
-		std::cout<<"Executing :'"<< _name <<"'"<<std::endl;
+		std::cout<<"Executing :'"<< _name <<"' #"<<omp_get_thread_num()<<std::endl;
 		try
 		{
 			_output = Execute( _input );
@@ -163,7 +179,7 @@ namespace p
 	template<class I, class O>
 	Pipeline<I,O>* Pipeline<I,O>::SetInput( Pipeline* p)
 	{
-		_inputPipeline.push_back(p);
+		_inputConnection.push_back(p);
 		_isCalculated = false;
 		return this;
 	}

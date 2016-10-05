@@ -6,19 +6,20 @@
 #include <typeinfo>
 #include <algorithm>
 #include <functional>
+#include <iterator>
+#include <unordered_set>
 
-#include <omp.h>
+// #include <omp.h>
 /***************************** * 
  OpenMP instead of native threading for improved portability 
 https://software.intel.com/en-us/articles/choosing-between-openmp-and-explicit-threading-methods
  * 
  *****************************/
 
-
 namespace p
 {
 
-	template <class I, class O>
+	template <typename I, typename O>
 	class Pipeline
 	{
 
@@ -27,6 +28,9 @@ namespace p
 		void BackPropagate(Pipeline*);
 		void CheckPipelineConnection(Pipeline*);
 		void RetroUpdate(Pipeline*);
+		O Execute(I* inputArray, int size);
+
+		static short level; //indentation level
 
 	protected:
 
@@ -37,7 +41,8 @@ namespace p
 		std::string _name;
 		bool _displayOutput, _isCalculated;
 
-		virtual O Execute(std::vector<I>) = 0;
+		virtual O Execute(typename std::vector<I>::iterator begin, typename std::vector<I>::iterator end) = 0; //generic iterator
+
 		virtual void toString(std::ostream& s = std::cout) {
 			s <<_name<<" - "<< _output;
 		}
@@ -45,13 +50,18 @@ namespace p
 
 	public:
 
+		static bool ValidateDAG( Pipeline* root );
+
 		Pipeline(std::string);
 		void Update(void);
 		Pipeline* SetInput(Pipeline*);
-		Pipeline* SetInput(const I);
+		Pipeline* SetInput(const I&);
 		O GetOutput(void);
 		bool HasBeenCalculated(void);
 		void EnableThreading(bool);
+
+		template<template<typename ELEM, typename ALLOC=std::allocator<ELEM> > class Container>
+		Pipeline* SetInput(const Container<I> i);
 
 		template<class U,class V>
 		friend std::ostream & operator << (std::ostream &os, Pipeline<U,V>* p);
@@ -61,6 +71,8 @@ namespace p
 
 	};
 
+	template<class I, class O>
+	short Pipeline<I,O>::level =0;
 
 	template<class I, class O>
 	void Pipeline<I,O>::EnableThreading(bool b)
@@ -86,13 +98,16 @@ namespace p
 	}
 
 
-
 	template<class I, class O>
-	Pipeline<I,O>::Pipeline(std::string s) : _name(s) {
+	Pipeline<I,O>::Pipeline(std::string s) : _name(s) 
+	{
+		// level = 0;
+
 		EnableThreading(false);
 		_isCalculated = false;
 		_displayOutput = false;
 	}
+
 
 	template<class I, class O>
 	void Pipeline<I,O>::BackPropagate(Pipeline* input)
@@ -108,7 +123,7 @@ namespace p
 	template<class I, class O>
 	void Pipeline<I,O>::CheckPipelineConnection(Pipeline* input)
 	{
-		// make sure input::output_type matche this::input_type
+		// make sure input::output_type matches this::input_type
 		try
 		{
 			// throw an error if cast fails
@@ -134,40 +149,64 @@ namespace p
 	{
 		#pragma omp task
 		{
-		try
-		{
-			this->BackPropagate(input);
-			this->CheckPipelineConnection(input);
-		}
-		catch (std::exception& e)
-		{
-			std::cerr<< "Could not backPropagate Pipeline: '"
-			<< input->_name << "' from '" << _name <<"'"
-			<< std::endl
-			<< e.what()
-			<< std::endl;
-			throw e;
-		}
+			try
+			{
+				level++;
+				this->BackPropagate(input);
+				this->CheckPipelineConnection(input);
+				level--;
+			}
+			catch (std::exception& e)
+			{
+				std::cerr<< "Could not backPropagate Pipeline: '"
+				<< input->_name << "' from '" << _name <<"'"
+				<< std::endl
+				<< e.what()
+				<< std::endl;
+				throw e;
+			}
 		}
 	}
 
 	template<class I, class O>
 	void Pipeline<I,O>::Update(void)
 	{
-
-		#pragma omp parallel
+		static bool checkForCycle=true;
+		if( checkForCycle )
 		{
-			#pragma omp single
-			std::for_each (std::next(_inputConnection.begin(),1),
-				_inputConnection.end(),
-				std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
+
+		}
+
+
+		std::cout<< std::string(3*level,' ') << "Executing :'"<< _name <<"'";
+		#ifdef _OPENMP
+			std::cout<<" #"<<omp_get_thread_num();<<std::endl;
+		#endif
+		std::cout<<std::endl;
+
+		try{ //omp pragma not threadsafe in try statement; try only for debug
+
+			#pragma omp parallel
+			{
+				if(!_inputConnection.empty())
+				#pragma omp single
+				std::for_each (std::next(_inputConnection.begin(),0),
+					_inputConnection.end(),
+					std::bind(&Pipeline::RetroUpdate,this,std::placeholders::_1));
+			}
+
+		}
+		catch(std::exception& e)
+		{
+			std::cerr << e.what()
+			<< std::endl;
+			// throw e;
 		}
 
 		// Execute processing from input list
-		std::cout<<"Executing :'"<< _name <<"' #"<<omp_get_thread_num()<<std::endl;
 		try
 		{
-			_output = Execute( _input );
+			_output = Execute( _input.begin(), _input.end() );
 			_isCalculated = true;
 		}
 		catch(std::exception& e)
@@ -190,7 +229,7 @@ namespace p
 	}
 
 	template<class I, class O>
-	Pipeline<I,O>* Pipeline<I,O>::SetInput(const I i)
+	Pipeline<I,O>* Pipeline<I,O>::SetInput(const I& i)
 	{
 		_input.push_back(i);
 		_isCalculated = false;
@@ -198,21 +237,90 @@ namespace p
 	}
 
 	template<class I, class O>
-	O Pipeline<I,O>::GetOutput(void)
+	template<template<typename ELEM, typename ALLOC=std::allocator<ELEM> > class Container>
+	Pipeline<I,O>* Pipeline<I,O>::SetInput(const Container<I> i)
+	{
+		std::copy(i.begin(), i.end(), std::back_inserter(_input));
+		_isCalculated = false;
+		return this;
+	}
+
+	template<class I, class O>
+	const O Pipeline<I,O>::GetOutput(void)
 	{
 		return _output;
 	}
 
 	template<class I, class O>
-	bool Pipeline<I,O>::HasBeenCalculated(void)
+	const bool Pipeline<I,O>::HasBeenCalculated(void)
 	{
 		return _isCalculated;
+	}
+
+	template<class I, class O>
+	Pipeline<I,O>* ValidateDAG( Pipeline* root )
+	{	
+		Pipeline<I,O>* cycle = nullptr;
+		static std::set<Pipeline*> finishedNodes; //black
+		static std::set<Pipeline*> knownNodes; //grey
+
+		// in case no cycle is found, all nodes are black from previous run i.e. finishedNodes is still full
+		if(knownNodes.empty()) finishedNodes.clear();
+		knownNodes.insert(root);
+
+		std::for_each(root->_inputConnection.begin(),
+					root->_inputConnection.end(),
+					[&](Pipeline* p){ 
+						// if node already visited -> cycle
+						if ( knownNodes.find( p ) != knownNodes.end() ) 
+						{
+							cycle = p;
+							finishedNodes.clear();
+							knownNodes.clear();
+							throw logic_error( "Pipeline is not Acyclic: "+(p->name)+" -> "+(root->name)+" -> ... -> "+(p->name) );
+							break;
+						}
+						else // dfs
+						{
+							cycle = ValidateDAG(p);
+							finishedNodes.insert( p );
+							knownNodes.erase( p );
+						}
+					 });
+
+		return cycle;
 	}
 
 }
 
 #endif
 
+/******************************************************************************
+
+Applications
+
+/******************************************************************************
+
+Preprocessing::cleaning
+Preprocessing::formatting
+Preprocessing::filtering
+Preprocessing::validation
+Preprocessing::removal / imputing missing data
+Preprocessing::normalization
+
+FeatureExtraction::transformation (FFT, Wavelet, etc.)
+FeatureExtraction::model comparison
+FeatureExtraction::parameter estimation
+FeatureExtraction::statistical parameters
+FeatureExtraction::geometric measurements
+
+Classifiers/Regressor::K-Nearest Neighbors
+Classifiers/Regressor::Logistic Regression
+Classifiers/Regressor::Neural Network
+Classifiers/Regressor::Fuzzy Logic
+Classifiers/Regressor::Decision Tree
+Classifiers/Regressor::Random Forest
+Classifiers/Regressor::Naïve Bayes
 
 
 /******************************************************************************

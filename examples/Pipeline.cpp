@@ -62,10 +62,17 @@ int main( int argc, char** argv)
 	f3->SetInput(f6);
 	
 	try
-		if( Pipeline::ValidateDAG(f6) ) 	
+	{
+		if( f5->ValidateDAG() ) 
+		{
 			f6->Update();
+		}	
+	}
 	catch( exception& e  ) 
+	{
 		cout<<e.what()<<endl;
+	}
+
 
 	// cout<<endl<<(*f1)<<endl<<f2<<endl;
 

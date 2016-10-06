@@ -7,7 +7,8 @@
 #include <algorithm>
 #include <functional>
 #include <iterator>
-#include <unordered_set>
+#include <set>
+#include <exception>
 
 // #include <omp.h>
 /***************************** * 
@@ -31,18 +32,19 @@ namespace p
 		O Execute(I* inputArray, int size);
 
 		static short level; //indentation level
+	
 
 	protected:
 
 		std::vector<I> _input;
 		std::vector<Pipeline*> _inputConnection;
 		O _output;
-
 		std::string _name;
 		bool _displayOutput, _isCalculated;
 
-		virtual O Execute(typename std::vector<I>::iterator begin, typename std::vector<I>::iterator end) = 0; //generic iterator
+		Pipeline* ValidateDAG(Pipeline*);
 
+		virtual O Execute(typename std::vector<I>::iterator begin, typename std::vector<I>::iterator end) = 0; //generic iterator
 		virtual void toString(std::ostream& s = std::cout) {
 			s <<_name<<" - "<< _output;
 		}
@@ -50,14 +52,13 @@ namespace p
 
 	public:
 
-		static bool ValidateDAG( Pipeline* root );
-
 		Pipeline(std::string);
 		void Update(void);
+		Pipeline* ValidateDAG(void);
 		Pipeline* SetInput(Pipeline*);
 		Pipeline* SetInput(const I&);
-		O GetOutput(void);
-		bool HasBeenCalculated(void);
+		const O GetOutput(void);
+		const bool HasBeenCalculated(void);
 		void EnableThreading(bool);
 
 		template<template<typename ELEM, typename ALLOC=std::allocator<ELEM> > class Container>
@@ -71,8 +72,62 @@ namespace p
 
 	};
 
+	class CyclicPipelineException : public std::exception
+	{
+	public:
+		std::string _a, _b;
+		CyclicPipelineException(std::string a, std::string b):_a(a),_b(b)
+		{}
+		virtual const char* what() const throw()
+		{
+			return ("Pipeline is not Acyclic: "+_a+" -> "+_b+" -> ... -> "+_a).c_str() ;
+		}
+	};
+
 	template<class I, class O>
 	short Pipeline<I,O>::level =0;
+
+	template<class I, class O>
+	Pipeline<I,O>* Pipeline<I,O>::ValidateDAG( Pipeline* root )
+	{	
+		Pipeline* cycle = nullptr;
+		static std::set<Pipeline*> finishedNodes; //black
+		static std::set<Pipeline*> knownNodes; //grey
+
+		// in case no cycle is found, all nodes are black from previous run i.e. finishedNodes is still full
+		if(knownNodes.empty()) finishedNodes.clear();
+		knownNodes.insert(root);
+
+		std::all_of(root->_inputConnection.begin(),
+					root->_inputConnection.end(),
+					[&](Pipeline* p){ 
+						// if node already visited -> cycle
+						if ( knownNodes.find( p ) != knownNodes.end() ) 
+						{
+							cycle = p;
+							finishedNodes.clear();
+							knownNodes.clear();
+							throw CyclicPipelineException( p->_name, root->_name );
+							return false; // exit (break does not work in for_each)
+						}
+						else // dfs
+						{
+							cycle = ValidateDAG( p );
+							finishedNodes.insert( p );
+							knownNodes.erase( p );
+							return true; // continue
+						}
+
+					 });
+
+		return cycle;
+	}
+
+	template<class I, class O>
+	Pipeline<I,O>* Pipeline<I,O>::ValidateDAG( void )
+	{	
+		ValidateDAG( this );
+	}
 
 	template<class I, class O>
 	void Pipeline<I,O>::EnableThreading(bool b)
@@ -255,40 +310,6 @@ namespace p
 	const bool Pipeline<I,O>::HasBeenCalculated(void)
 	{
 		return _isCalculated;
-	}
-
-	template<class I, class O>
-	Pipeline<I,O>* ValidateDAG( Pipeline* root )
-	{	
-		Pipeline<I,O>* cycle = nullptr;
-		static std::set<Pipeline*> finishedNodes; //black
-		static std::set<Pipeline*> knownNodes; //grey
-
-		// in case no cycle is found, all nodes are black from previous run i.e. finishedNodes is still full
-		if(knownNodes.empty()) finishedNodes.clear();
-		knownNodes.insert(root);
-
-		std::for_each(root->_inputConnection.begin(),
-					root->_inputConnection.end(),
-					[&](Pipeline* p){ 
-						// if node already visited -> cycle
-						if ( knownNodes.find( p ) != knownNodes.end() ) 
-						{
-							cycle = p;
-							finishedNodes.clear();
-							knownNodes.clear();
-							throw logic_error( "Pipeline is not Acyclic: "+(p->name)+" -> "+(root->name)+" -> ... -> "+(p->name) );
-							break;
-						}
-						else // dfs
-						{
-							cycle = ValidateDAG(p);
-							finishedNodes.insert( p );
-							knownNodes.erase( p );
-						}
-					 });
-
-		return cycle;
 	}
 
 }

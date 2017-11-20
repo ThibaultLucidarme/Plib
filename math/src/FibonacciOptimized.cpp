@@ -1,4 +1,5 @@
 #include <iostream>
+#include <cmath>
 
 /*
 	Time complexity Log(n)
@@ -22,50 +23,106 @@ with recurrence
 
 */
 
+typedef double type;
+
+struct Mat2x2
+{
+  Mat2x2( type a, type b, type c, type d)
+  {
+    x[0][0] = a;
+    x[0][1] = b;
+    x[1][0] = c;
+    x[1][1] = d;
+  }
+
+  type x[2][2];
+};
+
+struct Vec2
+{
+  Vec2(type a, type b)
+  {
+    x[0] = a;
+    x[1] = b;
+  }
+
+  type x[2];
+};
+
+
 
 class FibonacciSequence
 {
 private:
 
+	static type phi;
+	static type negphi;
+	static type sqrt5;
+
+
+	FibonacciSequence(){};
+
 	//matrix multiplication
-	int[2] multiply(const int a[2][2], const int b[2])
+	static Vec2 multiply( const Mat2x2 a, const Vec2 b)
 	{
+	    type V0 = a.x[0][0]*b.x[0] + a.x[0][1]*b.x[1];
+	    type V1 = a.x[1][0]*b.x[0] + a.x[1][1]*b.x[1];
 
-	    int mul[2];
-	    mul[0] = a[0][0]*b[0] + a[0][1]*b[1];
-	    mul[1] = a[1][0]*b[0] + a[1][1]*b[1];
-
-	 	return mul;
+	 	return Vec2( V0,V1 );
 	}
 
 
 	//matrix power
-	// TODO find close form or divide and conquer
-	int[2][2] power(int F[3][3], int n)
+	static Mat2x2 power( const unsigned int n)
 	{
 
-		float phi = 0.5*(1+sqrt(5));
-		float negphi = phi-1;
-		float sqrt5 = sqrt(5);
+		type phin = pow(phi,n);
+		type negphin = pow(negphi,n);
 
 		// close form S^n
-		unsigned int S00 = 2/20*( (5-sqrt5)*negphi^n + (5+sqrt5)*phi^n );
-		unsigned int S01 = 4/20*sqrt5* ( phi^n - negphi^n);
-		unsigned int S10 = S01;
-		unsigned int S11 = 2/20*( (5+sqrt5)*negphi^n + (5-sqrt5)*phi^n );
+		type S00 = 2.0f/20.0f*( (5.0f-sqrt5)*negphin + (5.0f+sqrt5)*phin );
+		type S01 = 4.0f/20.0f*sqrt5* ( phin - negphin );
+		type S10 = S01;
+		type S11 = 2.0f/20.0f*( (5.0f+sqrt5)*negphin + (5.0f-sqrt5)*phin );
 
-		return {{S00,S01}{S10,S11}}
+		// std::cout << S00<<"\t"<<S01<<std::endl<<S10<<"\t"<<S11<< std::endl;
+
+		return Mat2x2(S00,S01,S10,S11);
 
 	}
 
 
 public:
 
-	static int Get( unsigned int n)
+	static unsigned long long  Get( const unsigned int n)
 	{
+
+		 unsigned long long  result;
+
 		if (n <=1) return n;
-		else return multiply( power(n+1), {1,0} )[0];
+		else result = multiply( power(n-1), Vec2(1,0) ).x[0];
+
+		if ( result<0 ) std::cerr<< "type insuficient to contain Fibonacci Sequence number" <<std::endl;
+		return result;
 	}
 
 
 };
+
+type FibonacciSequence::phi =  0.5*(1+sqrt(5));
+type FibonacciSequence::negphi =  0.5*(1-sqrt(5));
+type FibonacciSequence::sqrt5 =  sqrt(5);
+
+
+int main ( int argc, char** argv)
+{
+
+	
+	// TODO :  automatic type for more than 93 limit wilth double/ unsigned long long
+	for ( int k=0; k<100; k++) 
+		std::cout << k << "\t:\t" << FibonacciSequence::Get(k) << std::endl;
+	
+
+	return 0;
+}
+
